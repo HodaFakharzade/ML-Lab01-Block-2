@@ -1,0 +1,255 @@
+---
+title: "Block 2 Lab1"
+author: "Ravinder Reddy Atla"
+date: "12/2/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Assignment 2
+
+### Problem Description :
+The problem was to implement expectation minimization algorithm for Bernouli 
+multivariate mixture model and analyze the estimated parameters and the 
+likelihood for K = 2,3,4.
+
+```{r echo = FALSE}
+set.seed(1234567890)
+
+max_it <- 100 # max number of EM iterations
+min_change <- 0.1 # min change in log likelihood between two consecutive EM iterations
+N=1000 # number of training points
+D=10 # number of dimensions
+x <- matrix(nrow=N, ncol=D) # training data
+
+true_pi <- vector(length = 3) # true mixing coefficients
+true_mu <- matrix(nrow=3, ncol=D) # true conditional distributions
+true_pi=c(1/3, 1/3, 1/3)
+true_mu[1,]=c(0.5,0.6,0.4,0.7,0.3,0.8,0.2,0.9,0.1,1)
+true_mu[2,]=c(0.5,0.4,0.6,0.3,0.7,0.2,0.8,0.1,0.9,0)
+true_mu[3,]=c(0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5)
+plot(true_mu[1,], type="o", col="blue", ylim=c(0,1))
+points(true_mu[2,], type="o", col="red")
+points(true_mu[3,], type="o", col="green")
+
+# Producing the training data
+for(n in 1:N) {
+  k <- sample(1:3,1,prob=true_pi)
+  for(d in 1:D) {
+    x[n,d] <- rbinom(1,1,true_mu[k,d])
+  }
+}
+```
+
+The EM function below takes the number of components(K) as input and prints 
+estimated parameters(pi,mu) and plots mu(for each component) and likelihood over
+the iterations.
+```{r message=FALSE}
+EM <- function(k){
+  set.seed(123456789)
+  K <- k
+  z <- matrix(nrow=N, ncol=K) # fractional component assignments
+  pi <- vector(length = K) # mixing coefficients
+  mu <- matrix(nrow=K, ncol=D) # conditional distributions
+  llik <- vector(length = max_it) # log likelihood of the EM iterations
+
+
+  # Random initialization of the parameters
+  pi <- runif(K,0.49,0.51)
+  pi <- pi / sum(pi)
+  for(k in 1:K) {
+    mu[k,] <- runif(D,0.49,0.51)
+  }
+  
+  colors <- c('red','blue','green','yellow')
+  
+  for(it in 1:max_it) {
+    
+    # E-step: Computation of the fractional component assignments
+    for(n in 1:N){
+      for(k in 1:K){
+        z[n,k] <- pi[k] %*% prod((mu[k,] ^ x[n,]) * ((1-mu[k,]) ^ (1 - x[n,])))
+      }
+    }
+    z <- z / rowSums(z)
+    n_k <- colSums(z)
+    x_mean_k <- (t(z) %*% x)/n_k
+    
+    
+    # Log Likelihood Calculation
+    #llik[it] <- sum(t(z) %*% (matrix(log(pi),ncol=K, nrow=N, byrow=TRUE)+ 
+                               #(x %*% t(log(mu)) + (1-x) %*% t(log(1-mu)))))
+    
+    llk = 0
+    for(i in 1:N){
+      for(j in 1:K){
+        llk_inner = 0
+        for(d in 1:D){
+          llk_inner = llk_inner+(x[i,d]*log(mu[j,d])+(1-x[i,d])*log(1-mu[j,d]))
+        }
+        llk = llk+(z[i,j]) * (log(pi[j])+llk_inner)
+      }
+    }
+    
+    llik[it] = llk
+    
+    #cat("iteration: ", it, "log likelihood: ", llik[it], "\n")
+    #flush.console() 
+    # Stop if the log likelihood has not changed significantly
+    if(it > 1){
+      if((llik[it] - llik[it-1]) <= 0.1){
+          break
+        }
+    }
+    
+    #M-step: ML parameter estimation from the data and fractional component assignments
+  
+    mu <- x_mean_k
+    pi <- n_k/sum(n_k)
+  }
+  print(pi)
+  print(mu)
+  plot(mu[1,], type="o", col=colors[1], ylim=c(0,1))
+  for(p in 2:K){
+    points(mu[p,], type="o",col = colors[p])
+  }
+  plot(llik[1:it], type="o")
+}
+```
+
+
+```{r message=FALSE}
+EM(2)
+EM(3)
+EM(4)
+```
+
+# Analysis:
+**K = 2** : As observed when two components were considered likelihood got 
+converged at 16th iteration. Parameter mu for both the components looks similarly 
+distributed.
+
+**K = 3** : When three components are used, likelihood took more iterations to
+converge which approximately around 80. mu for the new component lies between 
+the similar components obtained when two components were used. But,the distance
+between components 2 and 3 (blue and green to be precise) has increased when 
+compared with plot of 2 components.
+
+**K = 4** : Upon using four components, likelihood did converge by the end of 
+100 iterations. Distribution of mu for the components with blue,green and yellow
+colors are similar to the one with K=3. The new component with red color line 
+took irregular shape in the start and looked similar towards the end.
+
+
+#Appendix
+```{r eval=FALSE}
+################################
+#Assignment 2
+################################
+
+
+set.seed(1234567890)
+
+max_it <- 100 # max number of EM iterations
+min_change <- 0.1 # min change in log likelihood between two consecutive EM iterations
+N=1000 # number of training points
+D=10 # number of dimensions
+x <- matrix(nrow=N, ncol=D) # training data
+
+true_pi <- vector(length = 3) # true mixing coefficients
+true_mu <- matrix(nrow=3, ncol=D) # true conditional distributions
+true_pi=c(1/3, 1/3, 1/3)
+true_mu[1,]=c(0.5,0.6,0.4,0.7,0.3,0.8,0.2,0.9,0.1,1)
+true_mu[2,]=c(0.5,0.4,0.6,0.3,0.7,0.2,0.8,0.1,0.9,0)
+true_mu[3,]=c(0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5)
+plot(true_mu[1,], type="o", col="blue", ylim=c(0,1))
+points(true_mu[2,], type="o", col="red")
+points(true_mu[3,], type="o", col="green")
+
+# Producing the training data
+for(n in 1:N) {
+  k <- sample(1:3,1,prob=true_pi)
+  for(d in 1:D) {
+    x[n,d] <- rbinom(1,1,true_mu[k,d])
+  }
+}
+
+EM <- function(k){
+  set.seed(123456789)
+  K <- k
+  z <- matrix(nrow=N, ncol=K) # fractional component assignments
+  pi <- vector(length = K) # mixing coefficients
+  mu <- matrix(nrow=K, ncol=D) # conditional distributions
+  llik <- vector(length = max_it) # log likelihood of the EM iterations
+
+
+  # Random initialization of the parameters
+  pi <- runif(K,0.49,0.51)
+  pi <- pi / sum(pi)
+  for(k in 1:K) {
+    mu[k,] <- runif(D,0.49,0.51)
+  }
+  
+  colors <- c('red','blue','green','yellow')
+  
+  for(it in 1:max_it) {
+    
+    # E-step: Computation of the fractional component assignments
+    for(n in 1:N){
+      for(k in 1:K){
+        z[n,k] <- pi[k] %*% prod((mu[k,] ^ x[n,]) * ((1-mu[k,]) ^ (1 - x[n,])))
+      }
+    }
+    z <- z / rowSums(z)
+    n_k <- colSums(z)
+    x_mean_k <- (t(z) %*% x)/n_k
+    
+    
+    # Log Likelihood Calculation
+    #llik[it] <- sum(t(z) %*% (matrix(log(pi),ncol=K, nrow=N, byrow=TRUE)+ 
+                               #(x %*% t(log(mu)) + (1-x) %*% t(log(1-mu)))))
+    
+    llk = 0
+    for(i in 1:N){
+      for(j in 1:K){
+        llk_inner = 0
+        for(d in 1:D){
+          llk_inner = llk_inner+(x[i,d]*log(mu[j,d])+(1-x[i,d])*log(1-mu[j,d]))
+        }
+        llk = llk+(z[i,j]) * (log(pi[j])+llk_inner)
+      }
+    }
+    
+    llik[it] = llk
+    
+    #cat("iteration: ", it, "log likelihood: ", llik[it], "\n")
+    #flush.console() 
+    # Stop if the log likelihood has not changed significantly
+    if(it > 1){
+      if((llik[it] - llik[it-1]) <= 0.1){
+          break
+        }
+    }
+    
+    #M-step: ML parameter estimation from the data and fractional component assignments
+  
+    mu <- x_mean_k
+    pi <- n_k/sum(n_k)
+  }
+  print(pi)
+  print(mu)
+  plot(mu[1,], type="o", col=colors[1], ylim=c(0,1))
+  for(p in 2:K){
+    points(mu[p,], type="o",col = colors[p])
+  }
+  plot(llik[1:it], type="o")
+}
+
+EM(2)
+EM(3)
+EM(4)
+```
+
+
